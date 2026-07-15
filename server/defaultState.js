@@ -99,6 +99,7 @@ export function createDefaultState() {
     summaryExtras: {},
     sessions: { [today]: emptySession() },
     shopTodayEntries: [],
+    orderHistory: {},
     pickupRotations: {},
   };
 }

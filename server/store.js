@@ -1,14 +1,9 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { createDefaultState, emptySession } from './defaultState.js';
 import {
   applyPickupAssignments,
   PICKUP_TRIGGER_ACTIONS,
 } from './pickupAssign.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const STATE_FILE = path.join(__dirname, 'data', 'state.json');
+import { loadRawState, saveRawState, storageMode } from './stateRepo.js';
 
 const ADMIN_ACTIONS = new Set([
   'UPDATE_FUND_FIELD',
@@ -25,10 +20,12 @@ const ADMIN_ACTIONS = new Set([
   'SET_SESSION_ADVANCE',
   'FINALIZE_SESSION_COSTS',
   'DISBURSE_TO_SHOP_OWNER',
+  'CLOSE_DAY',
   'RESET',
 ]);
 
-let state = loadState();
+let state = createDefaultState();
+let ready = false;
 
 function orderTotal(o) {
   return Math.max(0, o.unitPrice - o.discount);
@@ -171,26 +168,36 @@ function migrateState(parsed) {
     };
   }
   if (!parsed.pickupRotations) parsed.pickupRotations = {};
+  if (!parsed.orderHistory) parsed.orderHistory = {};
   return applyPickupAssignments(parsed);
 }
 
-function loadState() {
+export async function initStore() {
   try {
-    if (fs.existsSync(STATE_FILE)) {
-      const raw = fs.readFileSync(STATE_FILE, 'utf-8');
-      return migrateState(JSON.parse(raw));
+    const raw = await loadRawState();
+    if (raw) {
+      state = migrateState(raw);
+      console.log(`[store] Loaded state from ${storageMode()}`);
+    } else {
+      state = createDefaultState();
+      await saveRawState(state);
+      console.log(`[store] Created default state in ${storageMode()}`);
     }
-  } catch {
-    /* ignore */
+  } catch (err) {
+    console.error('[store] Load failed, using defaults:', err.message);
+    state = createDefaultState();
   }
-  const initial = createDefaultState();
-  saveState(initial);
-  return initial;
+  ready = true;
+  return state;
 }
 
-function saveState(next) {
-  fs.mkdirSync(path.dirname(STATE_FILE), { recursive: true });
-  fs.writeFileSync(STATE_FILE, JSON.stringify(next, null, 2), 'utf-8');
+async function saveState(next) {
+  try {
+    await saveRawState(next);
+  } catch (err) {
+    console.error('[store] Save failed:', err.message);
+    throw err;
+  }
 }
 
 function applyActionCore(current, action) {
@@ -465,6 +472,47 @@ function applyActionCore(current, action) {
       };
       return syncSessionAdvance(next, current.sessionDate);
     }
+    case 'CLOSE_DAY': {
+      const currentDate = current.sessionDate;
+      const nextDate =
+        action.payload?.nextDate?.trim() ||
+        new Date().toISOString().slice(0, 10);
+      const session = getSession(current, currentDate);
+      const historyEntry = {
+        date: currentDate,
+        orders: structuredClone(current.todayOrders ?? []),
+        shops: structuredClone(current.shopTodayEntries ?? []),
+        summaryExtras: structuredClone(current.summaryExtras ?? {}),
+        session: structuredClone(session),
+        closedAt: new Date().toISOString(),
+      };
+      let next = {
+        ...current,
+        orderHistory: {
+          ...(current.orderHistory ?? {}),
+          [currentDate]: historyEntry,
+        },
+        todayOrders: [],
+        shopTodayEntries: [],
+        summaryExtras: {},
+        sessionDate: nextDate,
+      };
+      if (!next.orderDates.includes(nextDate)) {
+        next = {
+          ...next,
+          orderDates: [...next.orderDates, nextDate].sort(),
+          sessions: { ...next.sessions, [nextDate]: emptySession() },
+          fundEntries: next.fundEntries.map((f) => ({
+            ...f,
+            orderChecks: { ...f.orderChecks, [nextDate]: false },
+            dailyCosts: { ...f.dailyCosts, [nextDate]: 0 },
+          })),
+        };
+      } else if (!next.sessions[nextDate]) {
+        next = setSession(next, nextDate, emptySession());
+      }
+      return next;
+    }
     case 'RESET':
       return createDefaultState();
     default:
@@ -484,8 +532,15 @@ export function getState() {
   return state;
 }
 
-export function dispatchAction(action, auth) {
+export function isStoreReady() {
+  return ready;
+}
+
+export async function dispatchAction(action, auth) {
   const { isAdmin } = auth;
+  if (!ready) {
+    return { ok: false, error: 'Server chưa sẵn sàng' };
+  }
 
   if (ADMIN_ACTIONS.has(action.type)) {
     if (!isAdmin) {
@@ -532,6 +587,24 @@ export function dispatchAction(action, auth) {
     }
   }
 
+  if (action.type === 'CLOSE_DAY') {
+    const nextDate =
+      action.payload?.nextDate?.trim() ||
+      new Date().toISOString().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(nextDate)) {
+      return { ok: false, error: 'Ngày mới không hợp lệ' };
+    }
+    const hasData =
+      (state.todayOrders ?? []).length > 0 ||
+      (state.shopTodayEntries ?? []).length > 0;
+    if (!hasData && nextDate === state.sessionDate) {
+      return {
+        ok: false,
+        error: 'Chưa có dữ liệu hôm nay để lưu, hoặc chọn ngày mới khác',
+      };
+    }
+  }
+
   if (action.type === 'FINALIZE_SESSION_COSTS') {
     if (!hasShopOwnersToday(state)) {
       return {
@@ -575,7 +648,15 @@ export function dispatchAction(action, auth) {
     }
   }
 
-  state = applyAction(state, action);
-  saveState(state);
+  const next = applyAction(state, action);
+  try {
+    await saveState(next);
+  } catch (err) {
+    return {
+      ok: false,
+      error: err.message || 'Không lưu được dữ liệu',
+    };
+  }
+  state = next;
   return { ok: true, state };
 }

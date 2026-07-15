@@ -61,6 +61,16 @@ export interface OrderSession {
   costsFinalized: boolean;
 }
 
+/** Snapshot đặt món đã lưu của một ngày (sau khi chốt / sang ngày mới) */
+export interface DayHistory {
+  date: string;
+  orders: OrderEntry[];
+  shops: ShopTodayEntry[];
+  summaryExtras: Record<string, SummaryExtra>;
+  session: OrderSession;
+  closedAt: string;
+}
+
 export interface AppState {
   members: Member[];
   restaurants: Restaurant[];
@@ -73,6 +83,8 @@ export interface AppState {
   shopTodayEntries: ShopTodayEntry[];
   /** Lịch sử phiên theo ngày */
   sessions: Record<string, OrderSession>;
+  /** Lịch sử đặt món theo ngày (đã lưu) */
+  orderHistory: Record<string, DayHistory>;
   /** Vòng xoay random chọn người lấy đơn theo ngày */
   pickupRotations?: Record<string, PickupRotation>;
 }
@@ -139,6 +151,7 @@ export type StateAction =
       payload: { id: string; patch: Partial<ShopTodayEntry> };
     }
   | { type: 'DELETE_SHOP_TODAY'; payload: { id: string } }
+  | { type: 'CLOSE_DAY'; payload: { nextDate?: string } }
   | { type: 'RESET' };
 
 export interface AuthUser {

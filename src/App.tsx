@@ -4,18 +4,17 @@ import { useAppState } from './hooks/useAppState';
 import { OrderPage } from './components/OrderPage';
 import { RestaurantsPage } from './components/RestaurantsPage';
 import { FundPage } from './components/FundPage';
+import { HistoryPage } from './components/HistoryPage';
 import { LoginModal } from './components/LoginModal';
 import './App.css';
 
-type Tab = 'order' | 'restaurants' | 'fund';
+type Tab = 'order' | 'restaurants' | 'fund' | 'history';
 
 function AppContent() {
   const [tab, setTab] = useState<Tab>('order');
   const [loginOpen, setLoginOpen] = useState(false);
   const { user, logout, isAdmin, isLoggedIn } = useAuth();
   const app = useAppState();
-
-  const roleLabel = isAdmin ? 'Admin' : null;
 
   return (
     <div className="app">
@@ -43,6 +42,13 @@ function AppContent() {
           >
             Quản lý quỹ
           </button>
+          <button
+            type="button"
+            className={tab === 'history' ? 'active' : ''}
+            onClick={() => setTab('history')}
+          >
+            Lịch sử
+          </button>
         </nav>
 
         <div className="header-status">
@@ -57,7 +63,7 @@ function AppContent() {
           {isLoggedIn ? (
             <>
               <span className="admin-badge admin-role">
-                {roleLabel}: {user?.username}
+                Super Admin: {user?.username}
               </span>
               <button type="button" className="btn-header" onClick={logout}>
                 Đăng xuất
@@ -67,11 +73,15 @@ function AppContent() {
                   type="button"
                   className="btn-reset"
                   onClick={() => {
-                    if (confirm('Reset toàn bộ dữ liệu về mặc định?')) {
+                    if (
+                      confirm(
+                        'Reset XÓA TOÀN BỘ: thành viên, quán, quỹ, đơn hôm nay và lịch sử đã lưu. Bạn chắc chắn?',
+                      )
+                    ) {
                       app.resetState();
                     }
                   }}
-                  title="Reset dữ liệu"
+                  title="Xóa toàn bộ dữ liệu (kể cả lịch sử)"
                 >
                   Reset
                 </button>
@@ -125,6 +135,13 @@ function AppContent() {
             addOrderDate={app.addOrderDate}
             addMember={app.addMember}
             disburseToShopOwner={app.disburseToShopOwner}
+          />
+        )}
+        {tab === 'history' && (
+          <HistoryPage
+            state={app.state}
+            isAdmin={isAdmin}
+            closeDay={app.closeDay}
           />
         )}
       </main>

@@ -7,7 +7,7 @@ interface Props {
 }
 
 export function LoginModal({ open, onClose }: Props) {
-  const { login } = useAuth();
+  const { login, loginWithGoogle, googleAuthEnabled } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -30,14 +30,50 @@ export function LoginModal({ open, onClose }: Props) {
     onClose();
   };
 
+  const handleGoogle = async () => {
+    setLoading(true);
+    setError('');
+    const err = await loginWithGoogle();
+    setLoading(false);
+    if (err) setError(err);
+    // Nếu OK, trình duyệt sẽ redirect sang Google
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2>Đăng nhập</h2>
         <p className="modal-desc">
-          Đăng nhập <strong>Admin</strong> để quản lý quỹ, chốt chi phí, giải
-          ngân và sửa danh sách quán tham khảo.
+          Đăng nhập Google bằng tài khoản Super Admin để quản lý quỹ, chốt chi
+          phí, giải ngân và sửa danh sách quán.
         </p>
+
+        {googleAuthEnabled && (
+          <>
+            <button
+              type="button"
+              className="btn-google"
+              onClick={handleGoogle}
+              disabled={loading}
+            >
+              <span className="btn-google-icon" aria-hidden>
+                G
+              </span>
+              {loading ? 'Đang chuyển...' : 'Đăng nhập với Google'}
+            </button>
+            <div className="login-divider">
+              <span>hoặc tài khoản Admin mặc định</span>
+            </div>
+          </>
+        )}
+
+        {!googleAuthEnabled && (
+          <p className="form-error" style={{ marginBottom: 12 }}>
+            Chưa bật Google: thêm VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY
+            vào .env
+          </p>
+        )}
+
         <form onSubmit={handleSubmit}>
           <label>
             Tên đăng nhập
@@ -45,7 +81,7 @@ export function LoginModal({ open, onClose }: Props) {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              autoFocus
+              autoFocus={!googleAuthEnabled}
               required
             />
           </label>

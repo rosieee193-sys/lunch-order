@@ -6,11 +6,20 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { verifyCredentials, signToken, verifyToken, isAdminRole } from './auth.js';
-import { getState, dispatchAction } from './store.js';
+import {
+  verifyCredentials,
+  signToken,
+  verifyToken,
+  isAdminRole,
+  verifyGoogleAccessToken,
+} from './auth.js';
+import { getState, dispatchAction, initStore, isStoreReady } from './store.js';
+import { storageMode } from './stateRepo.js';
 
 const PORT = process.env.PORT || 3001;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+await initStore();
 
 const app = express();
 app.use(cors());
@@ -30,7 +39,12 @@ function broadcastState() {
 }
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, online: getOnlineCount() });
+  res.json({
+    ok: true,
+    online: getOnlineCount(),
+    storage: storageMode(),
+    storeReady: isStoreReady(),
+  });
 });
 
 app.get('/api/state', (_req, res) => {
@@ -50,6 +64,28 @@ app.post('/api/auth/login', (req, res) => {
   res.json({ token, username: cred.username, role: cred.role });
 });
 
+app.post('/api/auth/google', async (req, res) => {
+  const { access_token: accessToken } = req.body ?? {};
+  if (!accessToken) {
+    return res.status(400).json({ error: 'Thiếu access_token' });
+  }
+  const result = await verifyGoogleAccessToken(accessToken);
+  if (!result.ok) {
+    return res.status(403).json({ error: result.error });
+  }
+  const token = signToken(result.username, result.role, {
+    email: result.email,
+    auth: 'google',
+  });
+  res.json({
+    token,
+    username: result.username,
+    role: result.role,
+    email: result.email,
+    name: result.name,
+  });
+});
+
 app.get('/api/auth/me', (req, res) => {
   const header = req.headers.authorization;
   const token = header?.startsWith('Bearer ') ? header.slice(7) : null;
@@ -60,6 +96,8 @@ app.get('/api/auth/me', (req, res) => {
     authenticated: true,
     username: payload.username,
     role: payload.role,
+    email: payload.email ?? null,
+    auth: payload.auth ?? 'password',
   });
 });
 
@@ -79,16 +117,20 @@ io.on('connection', (socket) => {
   });
   io.emit('presence:update', { online: getOnlineCount() });
 
-  socket.on('state:action', (action, ack) => {
-    const result = dispatchAction(action, {
-      isAdmin: socket.isAdmin,
-    });
-    if (!result.ok) {
-      ack?.({ ok: false, error: result.error });
-      return;
+  socket.on('state:action', async (action, ack) => {
+    try {
+      const result = await dispatchAction(action, {
+        isAdmin: socket.isAdmin,
+      });
+      if (!result.ok) {
+        ack?.({ ok: false, error: result.error });
+        return;
+      }
+      broadcastState();
+      ack?.({ ok: true });
+    } catch (err) {
+      ack?.({ ok: false, error: err.message || 'Lỗi server' });
     }
-    broadcastState();
-    ack?.({ ok: true });
   });
 
   socket.on('disconnect', () => {
@@ -112,4 +154,5 @@ if (fs.existsSync(distPath)) {
 
 httpServer.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Storage: ${storageMode()}`);
 });

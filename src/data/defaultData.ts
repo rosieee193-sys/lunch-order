@@ -101,5 +101,7 @@ export function createDefaultState(): AppState {
     summaryExtras: {},
     sessions: { [today]: emptySession() },
     shopTodayEntries: [],
+    orderHistory: {},
+    pickupRotations: {},
   };
 }

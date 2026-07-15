@@ -191,6 +191,12 @@ export function useAppState() {
     [dispatch],
   );
 
+  const closeDay = useCallback(
+    (nextDate?: string) =>
+      dispatch({ type: 'CLOSE_DAY', payload: { nextDate } }),
+    [dispatch],
+  );
+
   const resetState = useCallback(() => dispatch({ type: 'RESET' }), [dispatch]);
 
   return {
@@ -219,6 +225,7 @@ export function useAppState() {
     addShopToday,
     updateShopToday,
     deleteShopToday,
+    closeDay,
     resetState,
   };
 }
