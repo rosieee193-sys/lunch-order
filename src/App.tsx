@@ -56,7 +56,9 @@ function AppContent() {
             className={`status-dot ${app.connected ? 'online' : 'offline'}`}
             title={app.connected ? 'Đã kết nối' : 'Mất kết nối'}
           />
-          <span className="online-count">{app.online} online</span>
+          <span className="online-count">
+            {app.connected ? 'Đồng bộ' : 'Mất kết nối'}
+          </span>
         </div>
 
         <div className="header-auth">

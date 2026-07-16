@@ -8,7 +8,8 @@ import type {
   StateAction,
 } from '../types';
 import { useAuth } from '../context/AuthContext';
-import { emitAction, getSocket, reconnectSocket } from '../api/socket';
+import { fetchState, postAction } from '../api/http';
+import { getBrowserSupabase } from '../api/supabaseBrowser';
 
 export function useAppState() {
   const { token, isAdmin } = useAuth();
@@ -18,54 +19,79 @@ export function useAppState() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const socket = getSocket(token);
+    let cancelled = false;
 
-    const onConnect = () => {
-      setConnected(true);
-      setError(null);
-    };
-    const onDisconnect = () => setConnected(false);
-    const onSync = (payload: { state: AppState; online: number }) => {
-      setState(payload.state);
-      setOnline(payload.online);
-    };
-    const onPresence = (payload: { online: number }) => {
-      setOnline(payload.online);
-    };
-    const onConnectError = () => {
-      setConnected(false);
-      setError('Không kết nối được server. Chạy npm run dev:all');
-    };
+    async function load() {
+      try {
+        const payload = await fetchState();
+        if (cancelled) return;
+        setState(payload.state);
+        setOnline(payload.online ?? 0);
+        setConnected(true);
+        setError(null);
+      } catch {
+        if (cancelled) return;
+        setConnected(false);
+        setError('Không kết nối được server');
+      }
+    }
 
-    socket.on('connect', onConnect);
-    socket.on('disconnect', onDisconnect);
-    socket.on('state:sync', onSync);
-    socket.on('presence:update', onPresence);
-    socket.on('connect_error', onConnectError);
+    void load();
 
-    if (socket.connected) onConnect();
+    const supabase = getBrowserSupabase();
+    const channel = supabase
+      ?.channel('app_state_sync')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'app_state',
+          filter: 'id=eq.main',
+        },
+        (payload) => {
+          const row = payload.new as { data?: AppState } | null;
+          if (row?.data) {
+            setState(row.data);
+            setConnected(true);
+          }
+        },
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') setConnected(true);
+      });
+
+    // Fallback poll nếu chưa có Realtime / anon key
+    const pollMs = supabase ? 30_000 : 5_000;
+    const pollId = window.setInterval(() => {
+      void load();
+    }, pollMs);
 
     return () => {
-      socket.off('connect', onConnect);
-      socket.off('disconnect', onDisconnect);
-      socket.off('state:sync', onSync);
-      socket.off('presence:update', onPresence);
-      socket.off('connect_error', onConnectError);
+      cancelled = true;
+      window.clearInterval(pollId);
+      if (channel && supabase) {
+        void supabase.removeChannel(channel);
+      }
     };
-  }, [token]);
-
-  useEffect(() => {
-    reconnectSocket(token);
-  }, [token]);
-
-  const dispatch = useCallback(async (action: StateAction) => {
-    const result = await emitAction(action);
-    if (!result.ok) {
-      setError(result.error ?? 'Thao tác thất bại');
-      setTimeout(() => setError(null), 5000);
-    }
-    return result;
   }, []);
+
+  const dispatch = useCallback(
+    async (action: StateAction) => {
+      const result = await postAction(action, token);
+      if (!result.ok) {
+        setError(result.error ?? 'Thao tác thất bại');
+        setTimeout(() => setError(null), 5000);
+        return result;
+      }
+      if (result.state) {
+        setState(result.state);
+        setConnected(true);
+      }
+      return result;
+    },
+    [token],
+  );
 
   const updateOrder = useCallback(
     (id: string, patch: Partial<OrderEntry>) =>

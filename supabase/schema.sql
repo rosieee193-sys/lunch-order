@@ -1,5 +1,5 @@
 -- Lunch Order — chạy trong Supabase SQL Editor (một lần)
--- Project Settings → API → dùng URL + service_role key trong .env server
+-- Project Settings → API → dùng URL + service_role key trong .env / Vercel
 
 create table if not exists app_state (
   id text primary key default 'main',
@@ -9,11 +9,19 @@ create table if not exists app_state (
 
 comment on table app_state is 'Toàn bộ AppState Lunch Order (members, orders, fund, history...)';
 
--- Cho phép service_role ghi; anon không cần truy cập bảng này (server dùng service_role)
 alter table app_state enable row level security;
 
--- Không policy cho anon/authenticated → chỉ service_role bypass RLS được ghi/đọc
+-- Client đọc để Realtime sync (ghi vẫn chỉ qua server + service_role)
+drop policy if exists "Anyone can read app_state" on app_state;
+create policy "Anyone can read app_state"
+  on app_state for select
+  to anon, authenticated
+  using (true);
 
--- Seed rỗng (tùy chọn). Server sẽ upsert nếu chưa có.
--- insert into app_state (id, data) values ('main', '{}'::jsonb)
--- on conflict (id) do nothing;
+-- Bật Realtime cho bảng (bỏ qua lỗi nếu đã có trong publication)
+do $$
+begin
+  alter publication supabase_realtime add table app_state;
+exception
+  when duplicate_object then null;
+end $$;

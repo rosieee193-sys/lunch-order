@@ -57,7 +57,11 @@ npm run dev:all
 - App: http://localhost:5173  
 - API health: http://localhost:3001/api/health (`storage`: `supabase` | `file`)
 
-## Production
+## Production (Vercel)
+
+Xem hướng dẫn **chỉ phần manual** tại [`MANUAL_SETUP.md`](MANUAL_SETUP.md).
+
+Local production-like:
 
 ```bash
 npm run build

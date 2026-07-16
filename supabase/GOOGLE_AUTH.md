@@ -1,34 +1,12 @@
 # Bật đăng nhập Google (Supabase Auth)
 
-## 1. Lấy anon key
-Supabase → **Project Settings** → **API**:
-- Project URL → `VITE_SUPABASE_URL` + `SUPABASE_URL`
-- `anon` `public` → `VITE_SUPABASE_ANON_KEY`
-- `service_role` → `SUPABASE_SERVICE_ROLE_KEY` (chỉ server)
+Chi tiết đầy đủ (kèm Vercel): xem [`MANUAL_SETUP.md`](../MANUAL_SETUP.md).
 
-## 2. Bật Google provider
-1. **Authentication** → **Providers** → **Google** → Enable
-2. Tạo OAuth Client trên [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
-   - Type: **Web application**
-   - Authorized redirect URIs: copy URI hiện trong trang Google provider của Supabase  
-     (dạng `https://<project-ref>.supabase.co/auth/v1/callback`)
-3. Dán **Client ID** + **Client Secret** vào Supabase Google provider → Save
+Tóm tắt:
 
-## 3. Redirect URL app
-**Authentication** → **URL Configuration**:
-- Site URL: `http://localhost:5173`
-- Redirect URLs: thêm `http://localhost:5173` (và domain production nếu có)
-
-## 4. Super Admin
-Trong `.env`:
-
-```env
-SUPER_ADMIN_EMAILS=linhptn@dinogames.gg
-```
-
-Chỉ các email trong list được cấp quyền Admin sau khi đăng nhập Google.
-
-## 5. Restart
-```bash
-npm run dev:all
-```
+1. **Settings → API**: lấy URL + `anon` → `VITE_SUPABASE_*`; `service_role` → server only
+2. **Authentication → Providers → Google**: bật + Client ID/Secret từ Google Cloud  
+   Redirect URI Google: `https://<project-ref>.supabase.co/auth/v1/callback`
+3. **URL Configuration**: Site URL + Redirect URLs = domain Vercel + `http://localhost:5173`
+4. `.env` / Vercel: `SUPER_ADMIN_EMAILS=linhptn@dinogames.gg`
+5. Redeploy Vercel sau khi thêm `VITE_*`

@@ -4,6 +4,7 @@ import {
   PICKUP_TRIGGER_ACTIONS,
 } from './pickupAssign.js';
 import { loadRawState, saveRawState, storageMode } from './stateRepo.js';
+import { isSupabaseEnabled } from './supabaseClient.js';
 
 const ADMIN_ACTIONS = new Set([
   'UPDATE_FUND_FIELD',
@@ -528,6 +529,21 @@ function applyAction(current, action) {
   return next;
 }
 
+export async function refreshState() {
+  const raw = await loadRawState();
+  if (raw) {
+    state = migrateState(raw);
+  }
+  return state;
+}
+
+export async function getStateFresh() {
+  if (isSupabaseEnabled()) {
+    await refreshState();
+  }
+  return state;
+}
+
 export function getState() {
   return state;
 }
@@ -540,6 +556,15 @@ export async function dispatchAction(action, auth) {
   const { isAdmin } = auth;
   if (!ready) {
     return { ok: false, error: 'Server chưa sẵn sàng' };
+  }
+
+  // Serverless / multi-instance: luôn lấy bản mới nhất từ Supabase trước khi ghi
+  if (isSupabaseEnabled()) {
+    try {
+      await refreshState();
+    } catch (err) {
+      return { ok: false, error: err.message || 'Không tải được dữ liệu' };
+    }
   }
 
   if (ADMIN_ACTIONS.has(action.type)) {
