@@ -69,8 +69,10 @@ export function LoginModal({ open, onClose }: Props) {
 
         {!googleAuthEnabled && (
           <p className="form-error" style={{ marginBottom: 12 }}>
-            Chưa bật Google: thêm VITE_SUPABASE_URL và VITE_SUPABASE_ANON_KEY
-            vào .env
+            Chưa bật Google: trên Vercel cần có VITE_SUPABASE_URL +
+            VITE_SUPABASE_ANON_KEY (hoặc SUPABASE_URL + SUPABASE_ANON_KEY từ
+            integration), rồi Redeploy. Local: thêm vào .env và restart{' '}
+            <code>npm run dev</code>.
           </p>
         )}
 

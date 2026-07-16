@@ -85,6 +85,17 @@ VITE_SUPABASE_ANON_KEY=<anon_public>
 
 > `VITE_*` phải có lúc **build**. Đổi anon key → Redeploy lại.
 
+### Nếu vẫn hiện “Chưa bật Google”
+
+1. Vercel → **Settings → Environment Variables** → xóa filter search, xác nhận có **cả hai**:
+   - `VITE_SUPABASE_URL` **hoặc** `SUPABASE_URL`
+   - `VITE_SUPABASE_ANON_KEY` **hoặc** `SUPABASE_ANON_KEY`
+2. Mở đúng domain trong **Vercel → Settings → Domains** (không phải URL `*-projects.vercel.app` bị chặn Auth).
+3. **Deployments → Redeploy** với **uncheck** “Use existing Build Cache”.
+4. Hard refresh trình duyệt (`Ctrl+Shift+R`).
+
+`https://h-order-eta.vercel.app` nếu 404 → domain chưa gắn project; dùng domain trong tab Domains.
+
 ---
 
 ## 5. Kiểm tra nhanh
