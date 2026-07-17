@@ -64,9 +64,29 @@ function AppContent() {
         <div className="header-auth">
           {isLoggedIn ? (
             <>
-              <span className="admin-badge admin-role">
-                Super Admin: {user?.username}
-              </span>
+              <div className="user-chip" title={user?.email || user?.username}>
+                {user?.avatarUrl ? (
+                  <img
+                    className="user-avatar"
+                    src={user.avatarUrl}
+                    alt=""
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="user-avatar user-avatar-fallback" aria-hidden>
+                    {(user?.name || user?.username || '?').charAt(0).toUpperCase()}
+                  </span>
+                )}
+                <span className="user-meta">
+                  <span className="user-name">
+                    {user?.name || user?.username}
+                  </span>
+                  <span className="user-sub">
+                    {user?.email || user?.username}
+                    {isAdmin ? ' · Super Admin' : ''}
+                  </span>
+                </span>
+              </div>
               <button type="button" className="btn-header" onClick={logout}>
                 Đăng xuất
               </button>

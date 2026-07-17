@@ -90,6 +90,8 @@ export function createApp() {
     }
     const token = signToken(result.username, result.role, {
       email: result.email,
+      name: result.name,
+      avatarUrl: result.avatarUrl,
       auth: 'google',
     });
     res.json({
@@ -98,6 +100,7 @@ export function createApp() {
       role: result.role,
       email: result.email,
       name: result.name,
+      avatarUrl: result.avatarUrl,
     });
   });
 
@@ -109,6 +112,8 @@ export function createApp() {
       username: payload.username,
       role: payload.role,
       email: payload.email ?? null,
+      name: payload.name ?? null,
+      avatarUrl: payload.avatarUrl ?? null,
       auth: payload.auth ?? 'password',
     });
   });

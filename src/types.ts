@@ -157,4 +157,8 @@ export type StateAction =
 export interface AuthUser {
   username: string;
   role: UserRole;
+  email?: string | null;
+  name?: string | null;
+  avatarUrl?: string | null;
+  auth?: 'google' | 'password';
 }

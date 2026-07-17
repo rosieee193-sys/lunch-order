@@ -56,7 +56,14 @@ export async function verifyGoogleAccessToken(accessToken) {
     username: email,
     email,
     role: 'admin',
-    name: data.user.user_metadata?.full_name || data.user.user_metadata?.name || email,
+    name:
+      data.user.user_metadata?.full_name ||
+      data.user.user_metadata?.name ||
+      email,
+    avatarUrl:
+      data.user.user_metadata?.avatar_url ||
+      data.user.user_metadata?.picture ||
+      null,
   };
 }
 

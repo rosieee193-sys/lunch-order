@@ -29,6 +29,24 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function toAuthUser(data: {
+  username: string;
+  role: UserRole;
+  email?: string | null;
+  name?: string | null;
+  avatarUrl?: string | null;
+  auth?: 'google' | 'password';
+}): AuthUser {
+  return {
+    username: data.username,
+    role: data.role,
+    email: data.email ?? null,
+    name: data.name ?? data.username,
+    avatarUrl: data.avatarUrl ?? null,
+    auth: data.auth ?? (data.email ? 'google' : 'password'),
+  };
+}
+
 async function exchangeGoogleToken(accessToken: string) {
   const res = await fetch('/api/auth/google', {
     method: 'POST',
@@ -41,8 +59,14 @@ async function exchangeGoogleToken(accessToken: string) {
   }
   return {
     token: data.token as string,
-    username: data.username as string,
-    role: data.role as UserRole,
+    user: toAuthUser({
+      username: data.username as string,
+      role: data.role as UserRole,
+      email: data.email as string | undefined,
+      name: data.name as string | undefined,
+      avatarUrl: data.avatarUrl as string | undefined,
+      auth: 'google',
+    }),
   };
 }
 
@@ -64,13 +88,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const accessToken = data.session?.access_token;
           if (accessToken) {
             const exchanged = await exchangeGoogleToken(accessToken);
-            if (!cancelled && !exchanged.error && exchanged.token) {
+            if (!cancelled && !exchanged.error && exchanged.token && exchanged.user) {
               localStorage.setItem(TOKEN_KEY, exchanged.token);
               setToken(exchanged.token);
-              setUser({
-                username: exchanged.username!,
-                role: exchanged.role!,
-              });
+              setUser(exchanged.user);
               setLoading(false);
               return;
             }
@@ -95,10 +116,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const data = await res.json();
         if (cancelled) return;
         if (data.authenticated) {
-          setUser({
-            username: data.username,
-            role: data.role as UserRole,
-          });
+          setUser(
+            toAuthUser({
+              username: data.username,
+              role: data.role as UserRole,
+              email: data.email,
+              name: data.name,
+              avatarUrl: data.avatarUrl,
+              auth: data.auth,
+            }),
+          );
           setToken(stored);
         } else {
           localStorage.removeItem(TOKEN_KEY);
@@ -132,7 +159,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!res.ok) return data.error ?? 'Đăng nhập thất bại';
     localStorage.setItem(TOKEN_KEY, data.token);
     setToken(data.token);
-    setUser({ username: data.username, role: data.role });
+    setUser(
+      toAuthUser({
+        username: data.username,
+        role: data.role,
+        name: data.username,
+        auth: 'password',
+      }),
+    );
     return null;
   }, []);
 
