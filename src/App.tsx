@@ -98,7 +98,11 @@ function AppContent() {
                   </span>
                   <span className="user-sub">
                     {user?.email || user?.username}
-                    {isAdmin ? ' · Super Admin' : ''}
+                    {isAdmin
+                      ? ' · Super Admin'
+                      : user?.auth === 'google'
+                        ? ' · Thành viên'
+                        : ''}
                   </span>
                 </span>
               </div>

@@ -48,8 +48,9 @@ export function LoginModal({ open, onClose }: Props) {
       <div className="modal" onClick={(e) => e.stopPropagation()}>
         <h2>Đăng nhập</h2>
         <p className="modal-desc">
-          Đăng nhập Google bằng tài khoản Super Admin để quản lý quỹ, chốt chi
-          phí, giải ngân và sửa danh sách quán.
+          Đăng nhập Google bằng tài khoản workspace (@dinogames.gg). Super Admin
+          quản lý quỹ / chốt chi phí; thành viên khác vẫn đăng nhập để hiện thông
+          tin cá nhân.
         </p>
 
         {googleAuthEnabled && (

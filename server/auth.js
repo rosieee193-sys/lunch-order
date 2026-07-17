@@ -14,9 +14,32 @@ function superAdminEmails() {
     .filter(Boolean);
 }
 
+/** Domain workspace được phép đăng nhập Google, phân tách bằng dấu phẩy */
+function allowedGoogleDomains() {
+  const raw = process.env.ALLOWED_GOOGLE_DOMAINS || 'dinogames.gg';
+  return raw
+    .split(',')
+    .map((d) => d.trim().toLowerCase().replace(/^@/, ''))
+    .filter(Boolean);
+}
+
 export function isSuperAdminEmail(email) {
   if (!email) return false;
   return superAdminEmails().includes(String(email).trim().toLowerCase());
+}
+
+export function isAllowedGoogleEmail(email) {
+  if (!email) return false;
+  const normalized = String(email).trim().toLowerCase();
+  if (isSuperAdminEmail(normalized)) return true;
+  const at = normalized.lastIndexOf('@');
+  if (at < 0) return false;
+  const domain = normalized.slice(at + 1);
+  return allowedGoogleDomains().includes(domain);
+}
+
+export function roleForGoogleEmail(email) {
+  return isSuperAdminEmail(email) ? 'admin' : 'member';
 }
 
 export function verifyCredentials(username, password) {
@@ -91,7 +114,8 @@ async function fetchUserViaRest(accessToken) {
 
 /**
  * Xác thực access_token từ Supabase Auth (sau Google login).
- * Chỉ email trong SUPER_ADMIN_EMAILS được cấp role admin.
+ * - Email thuộc ALLOWED_GOOGLE_DOMAINS (mặc định dinogames.gg) được đăng nhập
+ * - SUPER_ADMIN_EMAILS → role admin; còn lại → member
  */
 export async function verifyGoogleAccessToken(accessToken) {
   if (!accessToken) {
@@ -121,18 +145,21 @@ export async function verifyGoogleAccessToken(accessToken) {
     return { ok: false, error: 'Token Google/Supabase không hợp lệ' };
   }
 
-  if (!isSuperAdminEmail(mapped.email)) {
+  if (!isAllowedGoogleEmail(mapped.email)) {
+    const domains = allowedGoogleDomains().join(', ');
     return {
       ok: false,
-      error: `Tài khoản ${mapped.email} chưa được cấp quyền Super Admin`,
+      error: `Chỉ tài khoản Google thuộc workspace (${domains}) được đăng nhập. Email: ${mapped.email}`,
     };
   }
+
+  const role = roleForGoogleEmail(mapped.email);
 
   return {
     ok: true,
     username: mapped.email,
     email: mapped.email,
-    role: 'admin',
+    role,
     name: mapped.name,
     avatarUrl: mapped.avatarUrl,
   };
@@ -141,7 +168,7 @@ export async function verifyGoogleAccessToken(accessToken) {
 export function verifyToken(token) {
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    if (payload.role !== 'admin') return null;
+    if (payload.role !== 'admin' && payload.role !== 'member') return null;
     return payload;
   } catch {
     return null;

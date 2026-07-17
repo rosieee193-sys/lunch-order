@@ -105,7 +105,7 @@ export interface RestaurantSummary {
   payment: number;
 }
 
-export type UserRole = 'admin';
+export type UserRole = 'admin' | 'member';
 
 export type StateAction =
   | { type: 'UPDATE_ORDER'; payload: { id: string; patch: Partial<OrderEntry> } }

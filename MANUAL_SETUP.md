@@ -73,6 +73,7 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=<mật-khẩu-mạnh>
 JWT_SECRET=<chuỗi-ngẫu-nhiên-dài>
 SUPER_ADMIN_EMAILS=linhptn@dinogames.gg
+ALLOWED_GOOGLE_DOMAINS=dinogames.gg
 
 SUPABASE_URL=https://xxxx.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=<service_role>
