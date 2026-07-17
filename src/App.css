@@ -1283,6 +1283,21 @@ body {
   padding: 10px 24px;
   font-size: 13px;
   border-bottom: 1px solid #ff8182;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.toast-dismiss {
+  background: transparent;
+  border: 1px solid currentColor;
+  color: inherit;
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+  font-size: 12px;
+  flex-shrink: 0;
 }
 
 .guest-banner {

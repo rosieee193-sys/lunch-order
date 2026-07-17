@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useAppState } from './hooks/useAppState';
 import { OrderPage } from './components/OrderPage';
@@ -13,8 +13,23 @@ type Tab = 'order' | 'restaurants' | 'fund' | 'history';
 function AppContent() {
   const [tab, setTab] = useState<Tab>('order');
   const [loginOpen, setLoginOpen] = useState(false);
-  const { user, logout, isAdmin, isLoggedIn } = useAuth();
+  const {
+    user,
+    logout,
+    isAdmin,
+    isLoggedIn,
+    authError,
+    clearAuthError,
+    loading: authLoading,
+  } = useAuth();
   const app = useAppState();
+
+  // Sau Google redirect thất bại → mở modal + hiện lỗi
+  useEffect(() => {
+    if (!authLoading && authError && !isLoggedIn) {
+      setLoginOpen(true);
+    }
+  }, [authLoading, authError, isLoggedIn]);
 
   return (
     <div className="app">
@@ -121,6 +136,18 @@ function AppContent() {
         </div>
       </header>
 
+      {authError && (
+        <div className="toast-error" role="alert">
+          {authError}
+          <button
+            type="button"
+            className="toast-dismiss"
+            onClick={clearAuthError}
+          >
+            Đóng
+          </button>
+        </div>
+      )}
       {app.error && <div className="toast-error">{app.error}</div>}
 
       <main className="app-main">

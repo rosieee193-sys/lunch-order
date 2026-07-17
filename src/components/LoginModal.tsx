@@ -7,7 +7,8 @@ interface Props {
 }
 
 export function LoginModal({ open, onClose }: Props) {
-  const { login, loginWithGoogle, googleAuthEnabled } = useAuth();
+  const { login, loginWithGoogle, googleAuthEnabled, authError, clearAuthError } =
+    useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -19,6 +20,7 @@ export function LoginModal({ open, onClose }: Props) {
     e.preventDefault();
     setLoading(true);
     setError('');
+    clearAuthError();
     const err = await login(username, password);
     setLoading(false);
     if (err) {
@@ -33,11 +35,13 @@ export function LoginModal({ open, onClose }: Props) {
   const handleGoogle = async () => {
     setLoading(true);
     setError('');
+    clearAuthError();
     const err = await loginWithGoogle();
     setLoading(false);
     if (err) setError(err);
-    // Nếu OK, trình duyệt sẽ redirect sang Google
   };
+
+  const displayError = error || authError;
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -96,7 +100,7 @@ export function LoginModal({ open, onClose }: Props) {
               required
             />
           </label>
-          {error && <p className="form-error">{error}</p>}
+          {displayError && <p className="form-error">{displayError}</p>}
           <div className="modal-actions">
             <button type="button" className="btn-secondary" onClick={onClose}>
               Hủy

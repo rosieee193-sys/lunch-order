@@ -26,12 +26,10 @@ function authFromReq(req) {
   };
 }
 
-export function createApp() {
-  const app = express();
-  app.use(cors({ origin: true, credentials: true }));
-  app.use(express.json({ limit: '2mb' }));
+function buildApiRouter() {
+  const api = express.Router();
 
-  app.get('/api/health', (_req, res) => {
+  api.get('/health', (_req, res) => {
     res.json({
       ok: true,
       online: null,
@@ -40,7 +38,7 @@ export function createApp() {
     });
   });
 
-  app.get('/api/state', async (_req, res) => {
+  api.get('/state', async (_req, res) => {
     try {
       const state = await getStateFresh();
       res.json({ state, online: null });
@@ -49,7 +47,7 @@ export function createApp() {
     }
   });
 
-  app.post('/api/action', async (req, res) => {
+  api.post('/action', async (req, res) => {
     const { isAdmin } = authFromReq(req);
     const action = req.body?.action ?? req.body;
     if (!action?.type) {
@@ -66,7 +64,7 @@ export function createApp() {
     }
   });
 
-  app.post('/api/auth/login', (req, res) => {
+  api.post('/auth/login', (req, res) => {
     const { username, password } = req.body ?? {};
     if (!username || !password) {
       return res.status(400).json({ error: 'Thiếu username hoặc password' });
@@ -79,32 +77,38 @@ export function createApp() {
     res.json({ token, username: cred.username, role: cred.role });
   });
 
-  app.post('/api/auth/google', async (req, res) => {
+  api.post('/auth/google', async (req, res) => {
     const { access_token: accessToken } = req.body ?? {};
     if (!accessToken) {
       return res.status(400).json({ error: 'Thiếu access_token' });
     }
-    const result = await verifyGoogleAccessToken(accessToken);
-    if (!result.ok) {
-      return res.status(403).json({ error: result.error });
+    try {
+      const result = await verifyGoogleAccessToken(accessToken);
+      if (!result.ok) {
+        return res.status(403).json({ error: result.error });
+      }
+      const token = signToken(result.username, result.role, {
+        email: result.email,
+        name: result.name,
+        avatarUrl: result.avatarUrl,
+        auth: 'google',
+      });
+      res.json({
+        token,
+        username: result.username,
+        role: result.role,
+        email: result.email,
+        name: result.name,
+        avatarUrl: result.avatarUrl,
+      });
+    } catch (err) {
+      res.status(500).json({
+        error: err.message || 'Lỗi xác thực Google',
+      });
     }
-    const token = signToken(result.username, result.role, {
-      email: result.email,
-      name: result.name,
-      avatarUrl: result.avatarUrl,
-      auth: 'google',
-    });
-    res.json({
-      token,
-      username: result.username,
-      role: result.role,
-      email: result.email,
-      name: result.name,
-      avatarUrl: result.avatarUrl,
-    });
   });
 
-  app.get('/api/auth/me', (req, res) => {
+  api.get('/auth/me', (req, res) => {
     const { payload } = authFromReq(req);
     if (!payload) return res.json({ authenticated: false });
     res.json({
@@ -117,6 +121,20 @@ export function createApp() {
       auth: payload.auth ?? 'password',
     });
   });
+
+  return api;
+}
+
+export function createApp() {
+  const app = express();
+  app.use(cors({ origin: true, credentials: true }));
+  app.use(express.json({ limit: '2mb' }));
+
+  const api = buildApiRouter();
+  // Local + Vite proxy: /api/...
+  app.use('/api', api);
+  // Vercel rewrite đôi khi strip /api → mount thêm ở root
+  app.use(api);
 
   return app;
 }
