@@ -106,6 +106,25 @@ function consumeAuthError() {
   }
 }
 
+function provisionalFromSession(session: {
+  user: {
+    email?: string | null;
+    user_metadata?: Record<string, string | undefined>;
+  };
+}): AuthUser | null {
+  const email = session.user.email?.trim().toLowerCase();
+  if (!email) return null;
+  const meta = session.user.user_metadata || {};
+  return toAuthUser({
+    username: email,
+    role: 'member',
+    email,
+    name: meta.full_name || meta.name || email,
+    avatarUrl: meta.avatar_url || meta.picture || null,
+    auth: 'google',
+  });
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(() =>
@@ -116,25 +135,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     consumeAuthError(),
   );
 
-  const applyGoogleSession = useCallback(async (accessToken: string) => {
-    const exchanged = await exchangeGoogleToken(accessToken);
-    if (exchanged.error || !exchanged.token || !exchanged.user) {
-      const msg = exchanged.error || 'Đăng nhập Google thất bại';
-      rememberAuthError(msg);
-      setAuthError(msg);
-      const supabase = getBrowserSupabase();
-      await supabase?.auth.signOut();
-      localStorage.removeItem(TOKEN_KEY);
-      setToken(null);
-      setUser(null);
-      return false;
-    }
-    localStorage.setItem(TOKEN_KEY, exchanged.token);
-    setToken(exchanged.token);
-    setUser(exchanged.user);
-    setAuthError(null);
-    return true;
-  }, []);
+  const applyGoogleSession = useCallback(
+    async (accessToken: string, provisional?: AuthUser | null) => {
+      if (provisional) {
+        setUser(provisional);
+      }
+      const exchanged = await exchangeGoogleToken(accessToken);
+      if (exchanged.error || !exchanged.token || !exchanged.user) {
+        const msg = exchanged.error || 'Đăng nhập Google thất bại';
+        rememberAuthError(msg);
+        setAuthError(msg);
+        const supabase = getBrowserSupabase();
+        await supabase?.auth.signOut();
+        localStorage.removeItem(TOKEN_KEY);
+        setToken(null);
+        setUser(null);
+        return false;
+      }
+      localStorage.setItem(TOKEN_KEY, exchanged.token);
+      setToken(exchanged.token);
+      setUser(exchanged.user);
+      setAuthError(null);
+      return true;
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -175,7 +200,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (err) {
         if (!cancelled) {
           setAuthError(
-            err instanceof Error ? err.message : 'Không kiểm tra được phiên đăng nhập',
+            err instanceof Error
+              ? err.message
+              : 'Không kiểm tra được phiên đăng nhập',
           );
         }
       }
@@ -185,9 +212,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         if (supabase) {
           const { data } = await supabase.auth.getSession();
-          const accessToken = data.session?.access_token;
-          if (accessToken) {
-            await applyGoogleSession(accessToken);
+          const session = data.session;
+          const accessToken = session?.access_token;
+          if (accessToken && session) {
+            await applyGoogleSession(
+              accessToken,
+              provisionalFromSession(session),
+            );
             return;
           }
         }
@@ -213,13 +244,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ? supabase.auth.onAuthStateChange((event, session) => {
           if (cancelled) return;
           if (event === 'SIGNED_IN' && session?.access_token) {
-            void applyGoogleSession(session.access_token).finally(() => {
+            void applyGoogleSession(
+              session.access_token,
+              provisionalFromSession(session),
+            ).finally(() => {
               if (!cancelled) setLoading(false);
             });
-          }
-          if (event === 'SIGNED_OUT') {
-            // Chỉ clear nếu đang là phiên Google; password JWT vẫn giữ
-            // (signOut supabase không đụng local JWT password)
           }
         })
       : { data: { subscription: null } };

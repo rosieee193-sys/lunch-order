@@ -72,6 +72,7 @@ Nếu trước đó đã chạy schema cũ: chạy lại cũng được (script 
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=<mật-khẩu-mạnh>
 JWT_SECRET=<chuỗi-ngẫu-nhiên-dài>
+# Super Admin Google + workspace
 SUPER_ADMIN_EMAILS=linhptn@dinogames.gg
 ALLOWED_GOOGLE_DOMAINS=dinogames.gg
 
